@@ -34,6 +34,10 @@ import
   ".."/[conf, beacon_clock, beacon_node, version],
   "."/[slashing_protection, validator_pool, keystore_management]
 
+import stint/endians2
+import stint/private/datatypes
+import web3, web3/engine_api
+
 # Metrics for tracking attestation and beacon block loss
 const delayBuckets = [-Inf, -4.0, -2.0, -1.0, -0.5, -0.1, -0.05,
                       0.05, 0.1, 0.5, 1.0, 2.0, 4.0, 8.0, Inf]
@@ -416,6 +420,60 @@ proc getBlockProposalEth1Data*(node: BeaconNode,
       state, finalizedEpochRef.eth1_data,
       finalizedEpochRef.eth1_deposit_index)
 
+proc forkchoice_updated(state: merge.BeaconState,
+                        head_block_hash: Eth2Digest,
+                        finalized_block_hash: Eth2Digest,
+                        fee_recipient: Address,
+                        execution_engine: Web3DataProviderRef):
+                        Future[Option[merge.PayloadId]] {.async.} =
+  let
+    timestamp = compute_timestamp_at_slot(state, state.slot)
+    random = get_randao_mix(state, get_current_epoch(state))
+    payloadId =
+      (await execution_engine.forkchoiceUpdated(
+        head_block_hash, finalized_block_hash, timestamp, random.data,
+        fee_recipient)).payloadId
+  return if payloadId.isSome:
+    some(merge.PayloadId(payloadId.get))
+  else:
+    none(merge.PayloadId)
+
+# https://github.com/ethereum/consensus-specs/blob/v1.1.0/specs/merge/validator.md#executionpayload
+proc get_execution_payload(
+    payload_id: Option[merge.PayloadId], execution_engine: Web3DataProviderRef):
+    Future[merge.ExecutionPayload] {.async.} =
+  return if payload_id.isNone():
+    # Pre-merge, empty payload
+    default(merge.ExecutionPayload)
+  else:
+    template getTransaction(t: TypedTransaction): Transaction =
+      Transaction.init(t.distinctBase)
+
+    let rpcExecutionPayload =
+      await execution_engine.getPayload(payload_id.get)
+    when false:
+      debug "get_execution_payload: execution_engine.get_payload",
+        rpcExecutionPayload
+    # TODO split these conversions out and enable round-trip testing
+    merge.ExecutionPayload(
+      parent_hash: rpcExecutionPayload.parentHash.asEth2Digest,
+      feeRecipient:
+        ExecutionAddress(data: rpcExecutionPayload.feeRecipient.distinctBase),
+      state_root: rpcExecutionPayload.stateRoot.asEth2Digest,
+      receipts_root: rpcExecutionPayload.receiptsRoot.asEth2Digest,
+      logs_bloom: BloomLogs(data: rpcExecutionPayload.logsBloom.distinctBase),
+      random: rpcExecutionPayload.random.asEth2Digest,
+      block_number: rpcExecutionPayload.blockNumber.uint64,
+      gas_limit: rpcExecutionPayload.gasLimit.uint64,
+      gas_used: rpcExecutionPayload.gasUsed.uint64,
+      timestamp: rpcExecutionPayload.timestamp.uint64,
+      extra_data: List[byte, 32].init(rpcExecutionPayload.extraData.distinctBase),
+      base_fee_per_gas:
+        Eth2Digest(data: rpcExecutionPayload.baseFeePerGas.toBytesLE),
+      block_hash: rpcExecutionPayload.blockHash.asEth2Digest,
+      transactions: List[merge.Transaction, MAX_TRANSACTIONS_PER_PAYLOAD].init(
+        mapIt(rpcExecutionPayload.transactions, it.getTransaction)))
+
 proc makeBeaconBlockForHeadAndSlot*(node: BeaconNode,
                                     randao_reveal: ValidatorSig,
                                     validator_index: ValidatorIndex,
@@ -444,23 +502,63 @@ proc makeBeaconBlockForHeadAndSlot*(node: BeaconNode,
 
     let exits = withState(stateData.data):
       node.exitPool[].getBeaconBlockExits(state.data)
-    return makeBeaconBlock(
-      node.dag.cfg,
-      stateData.data,
-      validator_index,
-      randao_reveal,
-      eth1Proposal.vote,
-      graffiti,
-      node.attestationPool[].getAttestationsForBlock(stateData.data, cache),
-      eth1Proposal.deposits,
-      exits,
-      if slot.epoch < node.dag.cfg.ALTAIR_FORK_EPOCH:
-        SyncAggregate.init()
-      else:
-        node.sync_committee_msg_pool[].produceSyncAggregate(head.root),
-      default(merge.ExecutionPayload),
-      noRollback, # Temporary state - no need for rollback
-      cache)
+    try:
+      return makeBeaconBlock(
+        node.dag.cfg,
+        stateData.data,
+        validator_index,
+        randao_reveal,
+        eth1Proposal.vote,
+        graffiti,
+        node.attestationPool[].getAttestationsForBlock(stateData.data, cache),
+        eth1Proposal.deposits,
+        exits,
+        if slot.epoch < node.dag.cfg.ALTAIR_FORK_EPOCH:
+          SyncAggregate.init()
+        else:
+          node.sync_committee_msg_pool[].produceSyncAggregate(head.root),
+        if slot.epoch < node.dag.cfg.MERGE_FORK_EPOCH:
+          default(merge.ExecutionPayload)
+        else:
+          # TODO a more reasonable fallback
+          doAssert not node.eth1Monitor.isNil
+
+          # TODO the terminalBlockHash fallback exists to bootstrap this, but
+          # ugliness/complexity probably avoidable
+          let
+            feeRecipient =
+              Eth1Address.fromHex("0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+            terminalBlockHash =
+              if node.eth1Monitor.terminalBlockHash.isSome:
+                node.eth1Monitor.terminalBlockHash.get.asEth2Digest
+              else:
+                default(Eth2Digest)
+            latestHead =
+              if node.dag.head.executionBlockRoot != default(Eth2Digest):
+                node.dag.head.executionBlockRoot
+              else:
+                terminalBlockHash
+            latestFinalized =
+              if node.dag.finalizedHead.blck.executionBlockRoot != default(Eth2Digest):
+                node.dag.finalizedHead.blck.executionBlockRoot
+              else:
+                terminalBlockHash
+            payload_id = (await forkchoice_updated(
+              proposalState.data.mergeData.data, latestHead, latestFinalized,
+              feeRecipient, node.consensusManager.web3Provider))
+            payload = await get_execution_payload(
+              payload_id, node.consensusManager.web3Provider)
+          info "FOO5",
+            payload_id,
+            terminalBlockHash,
+            latestHead,
+            latestFinalized
+          payload,
+        noRollback, # Temporary state - no need for rollback
+        cache)
+    except CatchableError as err:
+      # Prefer not to create block at all if it can't get ExecutionPayload
+      error "Error creating beacon block", msg = err.msg
 
 proc proposeBlock(node: BeaconNode,
                   validator: AttachedValidator,
