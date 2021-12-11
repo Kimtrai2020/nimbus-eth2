@@ -11,6 +11,7 @@ import
   std/math,
   stew/results,
   chronicles, chronos, metrics,
+  eth/async_utils,
   ../spec/datatypes/[phase0, altair, merge],
   ../spec/[forks, signatures_batch],
   ../consensus_object_pools/[
@@ -255,6 +256,7 @@ proc runQueueProcessingLoop*(self: ref BlockProcessor) {.async.} =
       # in this case - doing so also allows us to benefit from more batching /
       # larger network reads when under load.
       idleTimeout = 10.milliseconds
+      web3Timeout = 750.milliseconds
 
     discard await idleAsync().withTimeout(idleTimeout)
 
@@ -267,9 +269,13 @@ proc runQueueProcessingLoop*(self: ref BlockProcessor) {.async.} =
             blck.blck.mergeData.message.body.execution_payload !=
               default(merge.ExecutionPayload):
           try:
-            await newExecutionPayload(
-              self.consensusManager.web3Provider,
-              blck.blck.mergeData.message.body.execution_payload)
+            awaitWithTimeout(
+              newExecutionPayload(
+                self.consensusManager.web3Provider,
+                blck.blck.mergeData.message.body.execution_payload),
+              web3Timeout):
+                info "runQueueProcessingLoop: newExecutionPayload timed out"
+                "SYNCING"
           except CatchableError as err:
             info "runQueueProcessingLoop: newExecutionPayload failed",
               err = err.msg
@@ -312,13 +318,15 @@ proc runQueueProcessingLoop*(self: ref BlockProcessor) {.async.} =
         executionPayloadStatus
 
       if headBlockRoot != default(Eth2Digest):
-        info "FOO15",
-          headBlockRoot,
-          finalizedBlockRoot
-
         try:
-          discard await forkchoiceUpdated(
-            self.consensusManager.web3Provider, headBlockRoot, finalizedBlockRoot)
+          discard awaitWithTimeout(
+            forkchoiceUpdated(
+              self.consensusManager.web3Provider, headBlockRoot,
+              finalizedBlockRoot),
+            web3Timeout):
+              info "runQueueProcessingLoop: forkchoiceUpdated timed out"
+              default(ForkchoiceUpdatedResponse)
         except CatchableError as err:
-          # TODO log error
+          info "runQueueProcessingLoop: forkchoiceUpdated failed",
+            err = err.msg
           discard

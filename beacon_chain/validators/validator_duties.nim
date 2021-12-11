@@ -36,7 +36,7 @@ import
 
 import stint/endians2
 import stint/private/datatypes
-import web3, web3/engine_api
+import web3, web3/[engine_api, ethtypes]
 
 # Metrics for tracking attestation and beacon block loss
 const delayBuckets = [-Inf, -4.0, -2.0, -1.0, -0.5, -0.1, -0.05,
@@ -423,7 +423,7 @@ proc getBlockProposalEth1Data*(node: BeaconNode,
 proc forkchoice_updated(state: merge.BeaconState,
                         head_block_hash: Eth2Digest,
                         finalized_block_hash: Eth2Digest,
-                        fee_recipient: Address,
+                        fee_recipient: ethtypes.Address,
                         execution_engine: Web3DataProviderRef):
                         Future[Option[merge.PayloadId]] {.async.} =
   let
