@@ -1270,7 +1270,7 @@ proc startEth1Syncing(m: Eth1Monitor, delayBeforeStart: Duration) {.async.} =
       # TODO why would latestEth1Block be isNone?
       var terminalBlockCandidate = nextBlock
 
-      info "FOO6",
+      info "startEth1Syncing: checking for merge terminal block",
         currentEpoch = m.currentEpoch,
         MERGE_FORK_EPOCH = m.cfg.MERGE_FORK_EPOCH,
         totalDifficult = nextBlock.totalDifficulty,

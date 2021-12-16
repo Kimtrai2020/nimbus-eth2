@@ -74,6 +74,12 @@ type
       ## Blockchain DAG, AttestationPool, Quarantine, and Eth1Manager
     getBeaconTime: GetBeaconTimeFn
 
+    # Optimistic sync head
+    # ----------------------------------------------------------------
+    # Initialized to zeros by default, which acts as an unset-state
+    optimisticSyncHeadSlot*: Slot
+    optimisticSyncHeadRoot*: Eth2Digest
+
     verifier: BatchVerifier
 
 # Initialization
@@ -256,7 +262,7 @@ proc runQueueProcessingLoop*(self: ref BlockProcessor) {.async.} =
       # in this case - doing so also allows us to benefit from more batching /
       # larger network reads when under load.
       idleTimeout = 10.milliseconds
-      web3Timeout = 750.milliseconds
+      web3Timeout = 650.milliseconds
 
     discard await idleAsync().withTimeout(idleTimeout)
 
@@ -287,30 +293,30 @@ proc runQueueProcessingLoop*(self: ref BlockProcessor) {.async.} =
     # TODO enum
     doAssert executionPayloadStatus in ["INVALID", "SYNCING", "VALID"]
 
-    info "FOO4",
-      executionPayloadStatus
-
     # https://github.com/ethereum/execution-apis/blob/v1.0.0-alpha.5/src/engine/specification.md#specification
     # "Client software MUST discard the payload if it's deemed invalid."
-    # TODO feed this back into gossip scoring
-    if  executionPayloadStatus != "INVALID" and self[].processBlock(blck) and
-        hasExecutionPayload:
-      # TODO should never be fcUpdating with 0's
+    if executionPayloadStatus == "INVALID":
+      info "runQueueProcessingLoop: execution payload invalid"
+      continue
+
+    if executionPayloadStatus == "VALID":
+      self[].processBlock(blck)
+
+    if executionPayloadStatus in ["SYNCING", "VALID"] and hasExecutionPayload:
       let
-        terminalBlockHash =
-          default(Eth2Digest)
         headBlockRoot =
-          if self.consensusManager.dag.head.executionBlockRoot != default(Eth2Digest):
+          if  self.consensusManager.dag.head.executionBlockRoot != default(Eth2Digest) and
+              self.consensusManager.dag.head.bid.slot >= self.optimisticSyncHeadSlot:
             self.consensusManager.dag.head.executionBlockRoot
           else:
-            terminalBlockHash
+            self.optimisticSyncHeadRoot
         finalizedBlockRoot =
           if self.consensusManager.dag.finalizedHead.blck.executionBlockRoot != default(Eth2Digest):
             self.consensusManager.dag.finalizedHead.blck.executionBlockRoot
           else:
-            terminalBlockHash
+            default(Eth2Digest)
 
-      info "FOO14",
+      info "runQueueProcessingLoop: running forkchoiceUpdated",
         headBlockRoot,
         finalizedBlockRoot,
         block_hash = blck.blck.mergeData.message.body.execution_payload.block_hash,

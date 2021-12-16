@@ -17,7 +17,7 @@ import
   chronicles, chronicles/timings,
   json_serialization/std/[options, sets, net], serialization/errors,
   eth/db/kvstore,
-  eth/keys, eth/p2p/discoveryv5/[protocol, enr],
+  eth/[async_utils, keys], eth/p2p/discoveryv5/[protocol, enr],
 
   # Local modules
   ../spec/datatypes/[phase0, altair, merge],
@@ -426,13 +426,32 @@ proc forkchoice_updated(state: merge.BeaconState,
                         fee_recipient: ethtypes.Address,
                         execution_engine: Web3DataProviderRef):
                         Future[Option[merge.PayloadId]] {.async.} =
+  const web3Timeout = 650.milliseconds
+
   let
     timestamp = compute_timestamp_at_slot(state, state.slot)
     random = get_randao_mix(state, get_current_epoch(state))
-    payloadId =
-      (await execution_engine.forkchoiceUpdated(
-        head_block_hash, finalized_block_hash, timestamp, random.data,
-        fee_recipient)).payloadId
+    # TODO have to separate out the payloadId = forkchoiceResponse.payloadId
+    # part, or else there's some Nim parsing issue
+    forkchoiceResponse =
+      awaitWithTimeout(
+        execution_engine.forkchoiceUpdated(
+          head_block_hash, finalized_block_hash, timestamp, random.data,
+          fee_recipient),
+        web3Timeout):
+          info "forkchoice_updated: forkchoiceUpdated timed out"
+          default(engine_api.ForkchoiceUpdatedResponse)
+    payloadId = forkchoiceResponse.payloadId
+
+  when false:
+    payloadId2 =
+      (awaitWithTimeout(
+        execution_engine.forkchoiceUpdated(
+          head_block_hash, finalized_block_hash, timestamp, random.data,
+          fee_recipient),
+        web3Timeout):
+          default(engine_api.ForkchoiceUpdatedResponse)).payloadId
+
   return if payloadId.isSome:
     some(merge.PayloadId(payloadId.get))
   else:
