@@ -87,8 +87,8 @@ elif defined(macosx) and defined(arm64):
   switch("passC", "-mcpu=apple-a14")
   switch("passL", "-mcpu=apple-a14")
 else:
-  switch("passC", "-march=native")
-  switch("passL", "-march=native")
+  switch("passC", "-march=broadwell")
+  switch("passL", "-march=broadwell")
   if defined(windows):
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65782
     # ("-fno-asynchronous-unwind-tables" breaks Nim's exception raising, sometimes)
