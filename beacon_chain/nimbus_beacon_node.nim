@@ -450,15 +450,17 @@ proc init*(T: type BeaconNode,
       let resfut = newFuture[Result[void, BlockError]]("blockVerifier")
 
       # TODO withFoo doesn't like when fields aren't always present across forks
-      case blk.kind:
+      case signedBlock.kind:
       of BeaconBlockFork.Phase0: discard
       of BeaconBlockFork.Altair: discard
       of BeaconBlockFork.Merge:
         # Bypass block processing queue latency. Optimistically.
-        if blockProcessor[].optimisticSyncHeadSlot < blk.mergeData.message.slot:
-          blockProcessor[].optimisticSyncHeadSlot = blk.mergeData.message.slot
+        if blockProcessor[].optimisticSyncHeadSlot <
+            signedBlock.mergeData.message.slot:
+          blockProcessor[].optimisticSyncHeadSlot =
+            signedBlock.mergeData.message.slot
           blockProcessor[].optimisticSyncHeadRoot =
-            blk.mergeData.message.body.execution_payload.block_hash
+            signedBlock.mergeData.message.body.execution_payload.block_hash
 
       blockProcessor[].addBlock(signedBlock, resfut)
       resfut
