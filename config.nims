@@ -87,7 +87,7 @@ elif defined(macosx) and defined(arm64):
   switch("passC", "-mcpu=apple-a14")
   switch("passL", "-mcpu=apple-a14")
 else:
-  if defined(amd64):
+  if defined(amd64) and not defined(macosx):
     switch("passC", "-march=broadwell")
     switch("passL", "-march=broadwell")
   else:

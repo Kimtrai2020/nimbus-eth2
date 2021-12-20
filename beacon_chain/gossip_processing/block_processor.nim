@@ -323,7 +323,8 @@ proc runQueueProcessingLoop*(self: ref BlockProcessor) {.async.} =
         parent_hash = blck.blck.mergeData.message.body.execution_payload.parent_hash,
         executionPayloadStatus
 
-      if headBlockRoot != default(Eth2Digest):
+      if  headBlockRoot      != default(Eth2Digest) and
+          finalizedBlockRoot != default(Eth2Digest):
         try:
           discard awaitWithTimeout(
             forkchoiceUpdated(
