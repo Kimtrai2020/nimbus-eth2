@@ -73,7 +73,6 @@ type
     RestAttestationError |
     RestGenericError |
     GetBlockV2Response |
-    GetStateV2Response |
     Web3SignerStatusResponse |
     Web3SignerKeysResponse |
     Web3SignerSignatureResponse |
@@ -87,11 +86,8 @@ type
 
   SszDecodeTypes* =
     GetPhase0StateSszResponse |
-    GetAltairStateSszResponse |
     GetPhase0BlockSszResponse |
-    GetAltairBlockSszResponse |
-    GetBlockV2Header |
-    GetStateV2Header
+    GetBlockV2Header
 
 {.push raises: [Defect].}
 

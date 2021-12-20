@@ -26,7 +26,7 @@ import
   # Local modules
   "."/[
     beacon_clock, beacon_chain_db, beacon_node, beacon_node_status,
-    conf, filepath, interop, nimbus_binary_common, statusbar,
+    conf, filepath, interop, nimbus_binary_common, statusbar, trusted_node_sync,
     version],
   ./networking/[eth2_discovery, eth2_network, network_metadata],
   ./gossip_processing/[eth2_processor, block_processor, consensus_manager],
@@ -184,8 +184,9 @@ proc init(T: type BeaconNode,
       try:
         # Checkpoint block might come from an earlier fork than the state with
         # the state having empty slots processed past the fork epoch.
-        checkpointBlock = readSszForkedTrustedSignedBeaconBlock(
+        let tmp = readSszForkedSignedBeaconBlock(
           cfg, readAllBytes(checkpointBlockPath).tryGet())
+        checkpointBlock = tmp.asTrusted()
       except SszError as err:
         fatal "Invalid checkpoint block", err = err.formatMsg(checkpointBlockPath)
         quit 1
@@ -434,6 +435,10 @@ proc init(T: type BeaconNode,
     syncManager = newSyncManager[Peer, PeerID](
       network.peerPool, SyncQueueKind.Forward, getLocalHeadSlot, getLocalWallSlot,
       getFirstSlotAtFinalizedEpoch, getBackfillSlot, blockVerifier)
+    backfiller = newSyncManager[Peer, PeerID](
+      network.peerPool, SyncQueueKind.Backward, getLocalHeadSlot, getLocalWallSlot,
+      getFirstSlotAtFinalizedEpoch, getBackfillSlot, blockVerifier,
+      maxHeadAge = 0)
 
   var node = BeaconNode(
     nickname: nickname,
@@ -455,6 +460,7 @@ proc init(T: type BeaconNode,
     eventBus: eventBus,
     requestManager: RequestManager.init(network, blockVerifier),
     syncManager: syncManager,
+    backfiller: backfiller,
     actionTracker: ActionTracker.init(rng, config.subscribeAllSubnets),
     processor: processor,
     blockProcessor: blockProcessor,
@@ -890,6 +896,11 @@ proc onSlotEnd(node: BeaconNode, slot: Slot) {.async.} =
   # above, this will be done just before the next slot starts
   await node.updateGossipStatus(slot + 1)
 
+proc syncStatus(node: BeaconNode): string =
+  if node.syncManager.inProgress: node.syncManager.syncStatus
+  elif node.backfiller.inProgress: "backfill: " & node.backfiller.syncStatus
+  else: "synced"
+
 proc onSlotStart(
     node: BeaconNode, wallTime: BeaconTime, lastSlot: Slot) {.async.} =
   ## Called at the beginning of a slot - usually every slot, but sometimes might
@@ -910,9 +921,7 @@ proc onSlotStart(
   info "Slot start",
     slot = shortLog(wallSlot),
     epoch = shortLog(wallSlot.epoch),
-    sync =
-      if node.syncManager.inProgress: node.syncManager.syncStatus
-      else: "synced",
+    sync = node.syncStatus(),
     peers = len(node.network.peerPool),
     head = shortLog(node.dag.head),
     finalized = shortLog(getStateField(
@@ -1103,6 +1112,18 @@ proc stop(node: BeaconNode) =
   node.db.close()
   notice "Databases closed"
 
+proc startBackfillTask(node: BeaconNode) {.async.} =
+  while node.dag.needsBackfill:
+    if not node.syncManager.inProgress:
+      # Only start the backfiller if it's needed _and_ head sync has completed -
+      # if we lose sync after having synced head, we could stop the backfilller,
+      # but this should be a fringe case - might as well keep the logic simple for
+      # now
+      node.backfiller.start()
+      return
+
+    await sleepAsync(chronos.seconds(2))
+
 proc run(node: BeaconNode) {.raises: [Defect, CatchableError].} =
   bnStatus = BeaconNodeStatus.Running
 
@@ -1120,6 +1141,8 @@ proc run(node: BeaconNode) {.raises: [Defect, CatchableError].} =
 
   node.requestManager.start()
   node.syncManager.start()
+
+  if node.dag.needsBackfill(): asyncSpawn node.startBackfillTask()
 
   waitFor node.updateGossipStatus(wallSlot)
 
@@ -1298,13 +1321,7 @@ proc initStatusBar(node: BeaconNode) {.raises: [Defect, ValueError].} =
       formatGwei(node.attachedValidatorBalanceTotal)
 
     of "sync_status":
-      if isNil(node.syncManager):
-        "pending"
-      else:
-        if node.syncManager.inProgress:
-          node.syncManager.syncStatus
-        else:
-          "synced"
+      node.syncStatus()
     else:
       # We ignore typos for now and just render the expression
       # as it was written. TODO: come up with a good way to show
@@ -1846,7 +1863,6 @@ proc doSlashingImport(conf: BeaconNodeConf) {.raises: [SerializationError, IOErr
   echo "Import finished: '", interchange, "' into '", dir/filetrunc & ".sqlite3", "'"
 
 proc doSlashingInterchange(conf: BeaconNodeConf) {.raises: [Defect, CatchableError].} =
-  doAssert conf.cmd == slashingdb
   case conf.slashingdbCmd
   of SlashProtCmd.`export`:
     conf.doSlashingExport()
@@ -1893,10 +1909,18 @@ programMain:
   let rng = keys.newRng()
 
   case config.cmd
-  of createTestnet: doCreateTestnet(config, rng[])
-  of noCommand: doRunBeaconNode(config, rng)
-  of deposits: doDeposits(config, rng[])
-  of wallets: doWallets(config, rng[])
-  of record: doRecord(config, rng[])
-  of web3: doWeb3Cmd(config)
-  of slashingdb: doSlashingInterchange(config)
+  of BNStartUpCmd.createTestnet: doCreateTestnet(config, rng[])
+  of BNStartUpCmd.noCommand: doRunBeaconNode(config, rng)
+  of BNStartUpCmd.deposits: doDeposits(config, rng[])
+  of BNStartUpCmd.wallets: doWallets(config, rng[])
+  of BNStartUpCmd.record: doRecord(config, rng[])
+  of BNStartUpCmd.web3: doWeb3Cmd(config)
+  of BNStartUpCmd.slashingdb: doSlashingInterchange(config)
+  of BNStartupCmd.trustedNodeSync:
+    # TODO use genesis state from metadata
+    waitFor doTrustedNodeSync(
+      getRuntimeConfig(config.eth2Network),
+      config.databaseDir,
+      config.trustedNodeUrl,
+      config.blockId,
+      config.backfillBlocks)

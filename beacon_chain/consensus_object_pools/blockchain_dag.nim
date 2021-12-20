@@ -1564,3 +1564,6 @@ proc aggregateAll*(
     err("aggregate: no attesting keys")
   else:
     ok(finish(aggregateKey))
+
+func needsBackfill*(dag: ChainDAGRef): bool =
+  dag.backfill.slot > dag.genesis.slot

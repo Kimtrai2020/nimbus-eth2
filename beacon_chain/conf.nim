@@ -36,7 +36,7 @@ const
   defaultSigningNodeRequestTimeout* = 60
 
 type
-  BNStartUpCmd* = enum
+  BNStartUpCmd* {.pure.} = enum
     noCommand
     createTestnet
     deposits
@@ -44,6 +44,7 @@ type
     record
     web3
     slashingdb
+    trustedNodeSync
 
   WalletsCmd* {.pure.} = enum
     create  = "Creates a new EIP-2386 wallet"
@@ -176,9 +177,9 @@ type
 
     case cmd* {.
       command
-      defaultValue: noCommand }: BNStartUpCmd
+      defaultValue: BNStartUpCmd.noCommand }: BNStartUpCmd
 
-    of noCommand:
+    of BNStartUpCmd.noCommand:
       bootstrapNodes* {.
         desc: "Specifies one or more bootstrap nodes to use when connecting to the network"
         abbr: "b"
@@ -231,12 +232,10 @@ type
         name: "weak-subjectivity-checkpoint" }: Option[Checkpoint]
 
       finalizedCheckpointState* {.
-        hidden # TODO unhide when backfilling is done
         desc: "SSZ file specifying a recent finalized state"
         name: "finalized-checkpoint-state" }: Option[InputFile]
 
       finalizedCheckpointBlock* {.
-        hidden # TODO unhide when backfilling is done
         desc: "SSZ file specifying a recent finalized block"
         name: "finalized-checkpoint-block" }: Option[InputFile]
 
@@ -386,7 +385,7 @@ type
         defaultValue: false
         name: "validator-monitor-totals" }: bool
 
-    of createTestnet:
+    of BNStartUpCmd.createTestnet:
       testnetDepositsFile* {.
         desc: "A LaunchPad deposits file for the genesis state validators"
         name: "deposits-file" }: InputFile
@@ -420,7 +419,7 @@ type
         desc: "Output file with list of bootstrap nodes for the network"
         name: "output-bootstrap-file" }: OutFile
 
-    of wallets:
+    of BNStartUpCmd.wallets:
       case walletsCmd* {.command.}: WalletsCmd
       of WalletsCmd.create:
         nextAccount* {.
@@ -453,7 +452,7 @@ type
       of WalletsCmd.list:
         discard
 
-    of deposits:
+    of BNStartUpCmd.deposits:
       case depositsCmd* {.command.}: DepositsCmd
       of DepositsCmd.createTestnetDeposits:
         totalDeposits* {.
@@ -512,7 +511,7 @@ type
           name: "epoch"
           desc: "The desired exit epoch" }: Option[uint64]
 
-    of record:
+    of BNStartUpCmd.record:
       case recordCmd* {.command.}: RecordCmd
       of RecordCmd.create:
         ipExt* {.
@@ -542,7 +541,7 @@ type
           desc: "ENR URI of the record to print"
           name: "enr" .}: Record
 
-    of web3:
+    of BNStartUpCmd.web3:
       case web3Cmd* {.command.}: Web3Cmd
       of Web3Cmd.test:
         web3TestUrl* {.
@@ -550,7 +549,7 @@ type
           desc: "The web3 provider URL to test"
           name: "url" }: Uri
 
-    of slashingdb:
+    of BNStartUpCmd.slashingdb:
       case slashingdbCmd* {.command.}: SlashProtCmd
       of SlashProtCmd.`import`:
         importedInterchangeFile* {.
@@ -565,6 +564,23 @@ type
         exportedInterchangeFile* {.
           desc: "EIP-3076 slashing protection interchange file to export"
           argument }: OutFile
+
+    of BNStartUpCmd.trustedNodeSync:
+      trustedNodeUrl* {.
+        desc: "URL of the REST API to sync from"
+        defaultValue: "http://localhost:5052"
+        name: "trusted-node-url"
+      .}: string
+
+      blockId* {.
+        desc: "Block id to sync to - this can be a block root, slot number, \"finalized\" or \"head\""
+        defaultValue: "finalized"
+      .}: string
+
+      backfillBlocks* {.
+        desc: "Backfill blocks directly from REST server instead of fetching via API"
+        defaultValue: true
+        name: "backfill"}: bool
 
   ValidatorClientConf* = object
     logLevel* {.

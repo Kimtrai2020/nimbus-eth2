@@ -78,8 +78,10 @@ proc getStateV2Plain*(state_id: StateIdent): RestPlainResponse {.
   ## https://ethereum.github.io/beacon-APIs/#/Debug/getStateV2
 
 proc getStateV2*(client: RestClientRef, state_id: StateIdent,
-                 forks: array[2, Fork],
-                 restAccept = ""): Future[ForkedHashedBeaconState] {.async.} =
+                 cfg: RuntimeConfig,
+                 restAccept = ""): Future[ref ForkedHashedBeaconState] {.async.} =
+  # nil is returned if the state is not found due to a 404 - `ref` is needed
+  # to manage stack usage
   let resp =
     if len(restAccept) > 0:
       await client.getStateV2Plain(state_id, restAcceptType = restAccept)
@@ -90,44 +92,26 @@ proc getStateV2*(client: RestClientRef, state_id: StateIdent,
     of 200:
       case resp.contentType
       of "application/json":
-        let state =
-          block:
-            let res = decodeBytes(GetStateV2Response, resp.data,
-                                  resp.contentType)
-            if res.isErr():
-              raise newException(RestError, $res.error())
-            res.get()
-        state
+        # let state =
+        #   block:
+        #     let res = decodeBytes(GetStateV2Response, resp.data,
+        #                           resp.contentType)
+        #     if res.isErr():
+        #       raise newException(RestError, $res.error())
+        #     res.get()
+        # state
+        # TODO
+        raise newException(RestError, "Downloading states via JSON not supported")
       of "application/octet-stream":
-        let header =
-          block:
-            let res = decodeBytes(GetStateV2Header, resp.data, resp.contentType)
-            if res.isErr():
-              raise newException(RestError, $res.error())
-            res.get()
-        if header.slot.epoch() < forks[1].epoch:
-          let state = newClone(
-            block:
-              let res = newClone(decodeBytes(
-                GetPhase0StateSszResponse, resp.data, resp.contentType))
-              if res[].isErr():
-                raise newException(RestError, $res[].error())
-              res[].get())
-          ForkedHashedBeaconState.init(phase0.HashedBeaconState(
-            data: state[], root: hash_tree_root(state[])))
-        else:
-          let state = newClone(
-            block:
-              let res = newClone(decodeBytes(
-                GetAltairStateSszResponse, resp.data, resp.contentType))
-              if res[].isErr():
-                raise newException(RestError, $res[].error())
-              res[].get())
-          ForkedHashedBeaconState.init(altair.HashedBeaconState(
-            data: state[], root: hash_tree_root(state[])))
+        try:
+          newClone(readSszForkedHashedBeaconState(cfg, resp.data))
+        except CatchableError as exc:
+          raise newException(RestError, exc.msg)
       else:
         raise newException(RestError, "Unsupported content-type")
-    of 400, 404, 500:
+    of 404:
+      nil
+    of 400, 500:
       let error =
         block:
           let res = decodeBytes(RestGenericError, resp.data, resp.contentType)
