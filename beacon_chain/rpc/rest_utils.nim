@@ -127,8 +127,10 @@ template withStateForBlockSlot*(node: BeaconNode,
       body
   else:
     let rpcState = assignClone(node.dag.headState)
-    node.dag.withState(rpcState[], blockSlot):
+    node.dag.withUpdatedState(rpcState[], blockSlot) do:
       body
+    do:
+      discard # Fall-through - rest handlers do their own thing here
 
 proc toValidatorIndex*(value: RestValidatorIndex): Result[ValidatorIndex,
                                                           ValidatorIndexError] =

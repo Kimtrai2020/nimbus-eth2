@@ -72,7 +72,12 @@ proc installValidatorApiHandlers*(router: var RestRouter, node: BeaconNode) =
     let duties =
       block:
         var res: seq[RestAttesterDuty]
-        let epochRef = node.dag.getEpochRef(qhead, qepoch)
+        let epochRef = block:
+          let tmp = node.dag.getEpochRef(qhead, qepoch, true)
+          if isErr(tmp):
+            return RestApiResponse.jsonError(Http400, PrunedStateError)
+          tmp.get()
+
         let committees_per_slot = get_committee_count_per_slot(epochRef)
         for i in 0 ..< SLOTS_PER_EPOCH:
           let slot = compute_start_slot_at_epoch(qepoch) + i
@@ -125,7 +130,11 @@ proc installValidatorApiHandlers*(router: var RestRouter, node: BeaconNode) =
     let duties =
       block:
         var res: seq[RestProposerDuty]
-        let epochRef = node.dag.getEpochRef(qhead, qepoch)
+        let epochRef = block:
+          let tmp = node.dag.getEpochRef(qhead, qepoch, true)
+          if isErr(tmp):
+            return RestApiResponse.jsonError(Http400, PrunedStateError)
+          tmp.get()
         for i, bp in epochRef.beacon_proposers:
           if i == 0 and qepoch == 0:
             # Fix for https://github.com/status-im/nimbus-eth2/issues/2488
@@ -413,7 +422,11 @@ proc installValidatorApiHandlers*(router: var RestRouter, node: BeaconNode) =
             if res.isErr():
               return RestApiResponse.jsonError(Http503, BeaconNodeInSyncError)
             res.get()
-        let epochRef = node.dag.getEpochRef(qhead, qslot.epoch)
+        let epochRef = block:
+          let tmp = node.dag.getEpochRef(qhead, qslot.epoch, true)
+          if isErr(tmp):
+            return RestApiResponse.jsonError(Http400, PrunedStateError)
+          tmp.get()
         makeAttestationData(epochRef, qhead.atSlot(qslot), qindex)
     return RestApiResponse.jsonResponse(adata)
 
@@ -512,7 +525,12 @@ proc installValidatorApiHandlers*(router: var RestRouter, node: BeaconNode) =
     template getAndCacheEpochRef(epochRefVar: var Option[EpochRef],
                                  epoch: Epoch): EpochRef =
       if epochRefVar.isNone:
-        epochRefVar = some node.dag.getEpochRef(head, epoch)
+        epochRefVar = block:
+          let epochRef = node.dag.getEpochRef(head, epoch, true)
+          if isErr(epochRef):
+            return RestApiResponse.jsonError(Http400, PrunedStateError)
+          some epochRef.get()
+
       epochRefVar.get
 
     for request in requests:

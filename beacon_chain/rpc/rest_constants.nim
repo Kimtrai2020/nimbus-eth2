@@ -183,3 +183,5 @@ const
     "Invalid validator's public key(s) found"
   BadRequestFormatError* =
     "Bad request format"
+  PrunedStateError* =
+    "Trying to access a pruned historical state"
