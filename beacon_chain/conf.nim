@@ -370,7 +370,7 @@ type
         hidden
         desc: "Override pre-configured TERMINAL_TOTAL_DIFFICULTY parameter"
         name: "terminal-total-difficulty-override"
-      }: Option[uint64]
+      }: Option[string]
 
     of createTestnet:
       testnetDepositsFile* {.
