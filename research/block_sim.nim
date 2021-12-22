@@ -138,6 +138,8 @@ cli do(slots = SLOTS_PER_EPOCH * 6,
                 aggregation_bits: aggregation_bits,
                 signature: sig.toValidatorSig()
               ), [validatorIdx], sig, data.slot.toBeaconTime)
+    do:
+      raiseAssert "withUpdatedState failed"
 
   proc handleSyncCommitteeActions(slot: Slot) =
     type
