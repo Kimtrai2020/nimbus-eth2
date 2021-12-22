@@ -103,7 +103,7 @@ func check_propagation_slot_range(
 
 func check_beacon_and_target_block(
     pool: var AttestationPool, data: AttestationData):
-    Result[BlockRef, ValidationError] =
+    Result[BlockSlot, ValidationError] =
   # The block being voted for (data.beacon_block_root) passes validation - by
   # extension, the target block must at that point also pass validation.
   # The target block is returned.
@@ -122,16 +122,16 @@ func check_beacon_and_target_block(
   # attestation.data.beacon_block_root,
   # compute_start_slot_at_epoch(attestation.data.target.epoch)) ==
   # attestation.data.target.root
+  # the sanity of target.epoch has been checked by check_attestation_slot_target
   let
-    target = get_ancestor(
-      blck, compute_start_slot_at_epoch(data.target.epoch), SLOTS_PER_EPOCH.int)
+    target = blck.atSlot(compute_start_slot_at_epoch(data.target.epoch))
 
-  if isNil(target):
+  if isNil(target.blck):
     # Shouldn't happen - we've checked that the target epoch is within range
     # already
     return errReject("Attestation target block not found")
 
-  if not (target.root == data.target.root):
+  if not (target.blck.root == data.target.root):
     return errReject(
       "Attestation target block not the correct ancestor of LMD vote block")
 
@@ -424,7 +424,7 @@ proc validateAttestation*(
   # store.finalized_checkpoint.root
   let
     epochRef = block:
-      let tmp = pool.dag.getEpochRef(target, target.slot.epoch, false)
+      let tmp = pool.dag.getEpochRef(target.blck, target.slot.epoch, false)
       if isErr(tmp): # shouldn't happen since we verified target
         warn "No EpochRef for attestation",
           attestation = shortLog(attestation), target = shortLog(target)
@@ -601,7 +601,7 @@ proc validateAggregate*(
   # aggregate.data.index, aggregate_and_proof.selection_proof) returns True.
   let
     epochRef = block:
-      let tmp = pool.dag.getEpochRef(target, aggregate.data.target.epoch, false)
+      let tmp = pool.dag.getEpochRef(target.blck, target.slot.epoch, false)
       if tmp.isErr: # shouldn't happen since we verified target
         warn "No EpochRef for attestation - report bug",
           aggregate = shortLog(aggregate), target = shortLog(target)
