@@ -21,12 +21,14 @@ import
   ./spec/datatypes/base,
   ./networking/network_metadata,
   ./validators/slashing_protection_common,
-  ./filepath
+  ./filepath,
+  ../vendor/nim-eth/eth/net/nat
 
 export
   uri,
   defaultEth2TcpPort, enabledLogLevel, ValidIpAddress,
-  defs, parseCmdArg, completeCmdArg, network_metadata
+  defs, parseCmdArg, completeCmdArg, network_metadata,
+  nat, network
 
 const
   # TODO: How should we select between IPv4 and IPv6
@@ -327,11 +329,26 @@ type
         defaultValueDesc: "127.0.0.1"
         name: "rest-address" }: ValidIpAddress
 
-      validatorApiEnabled* {.
-        desc: "Enable the REST (BETA version) validator keystore management " &
-              "API",
-        defaultValue: false,
-        name: "validator-api"}: bool
+      keymanagerEnabled* {.
+        desc: "Enable the REST keymanager API (BETA version)"
+        defaultValue: false
+        name: "keymanager" }: bool
+
+      keymanagerPort* {.
+        desc: "Listening port for the REST keymanager API"
+        defaultValue: DefaultEth2RestPort
+        defaultValueDesc: "5052"
+        name: "keymanager-port" }: Port
+
+      keymanagerAddress* {.
+        desc: "Listening port for the REST keymanager API"
+        defaultValue: defaultAdminListenAddress
+        defaultValueDesc: "127.0.0.1"
+        name: "keymanager-address" }: ValidIpAddress
+
+      keymanagerTokenFile* {.
+        desc: "A file specifying the authorizition token required for accessing the keymanager API"
+        name: "keymanager-token-file" }: Option[InputFile]
 
       inProcessValidators* {.
         desc: "Disable the push model (the beacon node tells a signing process with the private keys of the validators what to sign and when) and load the validators in the beacon node itself"
@@ -602,11 +619,26 @@ type
       desc: "A directory containing validator keystore passwords"
       name: "secrets-dir" }: Option[InputDir]
 
-    validatorApiEnabled* {.
-      desc: "Enable the REST (BETA version) validator keystore management " &
-            "API",
-      defaultValue: false,
-      name: "validator-api"}: bool
+    keymanagerEnabled* {.
+      desc: "Enable the REST keymanager API (BETA version)"
+      defaultValue: false
+      name: "keymanager" }: bool
+
+    keymanagerPort* {.
+      desc: "Listening port for the REST keymanager API"
+      defaultValue: DefaultEth2RestPort
+      defaultValueDesc: "5052"
+      name: "keymanager-port" }: Port
+
+    keymanagerAddress* {.
+      desc: "Listening port for the REST keymanager API"
+      defaultValue: defaultAdminListenAddress
+      defaultValueDesc: "127.0.0.1"
+      name: "keymanager-address" }: ValidIpAddress
+
+    keymanagerTokenFile* {.
+      desc: "A file specifying the authorizition token required for accessing the keymanager API"
+      name: "keymanager-token-file" }: Option[InputFile]
 
     case cmd* {.
       command

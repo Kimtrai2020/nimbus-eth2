@@ -1,0 +1,38 @@
+[
+    {
+        "topics": ["validator", "attester_duties"],
+        "request": {
+        "url": "/eth/v1/keystores",
+        "method": "POST",
+        "headers": {"Accept": "application/json"},
+        "body": {"content-type": "application/json",
+            "data":   
+            "{
+                \"keystores\" :
+                [
+                    {\"crypto\":{\"kdf\":{\"function\":\"pbkdf2\",\"params\":{\"dklen\":32,\"c\":262144,\"prf\":\"hmac-sha256\",\"salt\":\"8efaabef038b7d22353159466bc9d48dd026f209245e07edefd96f461ade3e0a\"},\"message\":\"\"},\"checksum\":{\"function\":\"sha256\",\"params\":{},\"message\":\"5f855da87d689b39257b426eda2b4ff2b275dfd76745108db5dc258b434afe29\"},\"cipher\":{\"function\":\"aes-128-ctr\",\"params\":{\"iv\":\"35164064b83b0c4e60d76cb9407c7ba3\"},\"message\":\"027ea0b697a008c2cbffb19b666822923c4f72ad100694aeccfe2ea076cd252a\"}},\"description\":\"\",\"pubkey\":\"0x955e94998bc90f2a3d3ea0cb24298fa01df5d6171d56bce1832229c5b53a7ae7a7eceb8704b03fe20bc2a119a9ab82bf\",\"path\":\"m/12381/3600/7/0/0\",\"uuid\":\"b5930fe0-d7c0-45fc-8bc0-216730ef6a57\",\"version\":4},
+                    {\"crypto\":{\"kdf\":{\"function\":\"pbkdf2\",\"params\":{\"dklen\":32,\"c\":262144,\"prf\":\"hmac-sha256\",\"salt\":\"867298c8ac15130930c2747c2860016eee7b44546f098212ecbde04b43e7d2ed\"},\"message\":\"\"},\"checksum\":{\"function\":\"sha256\",\"params\":{},\"message\":\"5eb8e83cf2872dd643906662d3c4efcfdeec805d6088a382a7f2c6cb18b18314\"},\"cipher\":{\"function\":\"aes-128-ctr\",\"params\":{\"iv\":\"026cdf3657eaf9656e8607ce82f982b8\"},\"message\":\"131450bec3c73f11d24f290f2c43d8113ba56e22a4932609afeff3ed1e89bce4\"}},\"description\":\"\",\"pubkey\":\"0x8a64b0bf937c51b6ae320cc92ba63a7a16756b6d9a69564f8d1b8f30b19979df5a15d3cdfd3933e4c4752d1670928294\",\"path\":\"m\/12381\/3600\/29\/0\/0\",\"uuid\":\"0f69e125-b2e8-4ca0-a3ec-8839312c7f84\",\"version\":4}
+                ],
+    
+                \"passwords\":
+                [
+                    \"E65C0B1E5EF2D69170A308497842CF2EFD04F1035AF80CE4AB296606E14CC575\",
+                    \"A3A5BF7597DD1BEE380F6BC8005007FD763B06BDC777E6648A3A029D220F383A\"
+                ],
+                
+                \"slashing_protection\":
+                    {\"metadata\":{\"interchange_format_version\":\"5\",\"genesis_validators_root\":\"0x49433f6970d0e19c831eee073a530aa994c0668174019b0aaa89280abe51d7ba\"} 
+                    ,\"data\":[
+                        {\"pubkey\":\"0x955e94998bc90f2a3d3ea0cb24298fa01df5d6171d56bce1832229c5b53a7ae7a7eceb8704b03fe20bc2a119a9ab82bf\",\"signed_blocks\":[{\"slot\":\"24\",\"signing_root\":\"0xe5eaed93411ff8acdb0306335d3ea6a2fec63984351a85f50f0e8d7044cf0f79\"},{\"slot\":\"39\",\"signing_root\":\"0x87aedb9d734d386af7d55d8ab7324102257cfa829bc1f342925adb0a5f4f81a1\"},{\"slot\":\"43\",\"signing_root\":\"0xe006de1fafcb393d82f209973f7358814891a48bf6f99f16c24910721175f5eb\"},{\"slot\":\"73\",\"signing_root\":\"0x3f0c29b3633c3019247bcee8b2e1713b15724e62aaf958e0a89393dc8882af67\"},{\"slot\":\"77\",\"signing_root\":\"0xa63b60578b94f9877714767bc08c3b7384273c32b38b398c4a3826279868395b\"}],\"signed_attestations\":[{\"source_epoch\":\"0\",\"target_epoch\":\"0\",\"signing_root\":\"0x3297c22a09e217839e32b19dba38b4f32001fda529a8eca4fd3d1f4933b8b124\"},{\"source_epoch\":\"0\",\"target_epoch\":\"1\",\"signing_root\":\"0x9cf8343e487412f5805a5f439b150e644659247717c12d3275a541b44ac10b1d\"}]},
+                        {\"pubkey\":\"0x8a64b0bf937c51b6ae320cc92ba63a7a16756b6d9a69564f8d1b8f30b19979df5a15d3cdfd3933e4c4752d1670928294\",\"signed_blocks\":[{\"slot\":\"24\",\"signing_root\":\"0xe5eaed93411ff8acdb0306335d3ea6a2fec63984351a85f50f0e8d7044cf0f79\"},{\"slot\":\"39\",\"signing_root\":\"0x87aedb9d734d386af7d55d8ab7324102257cfa829bc1f342925adb0a5f4f81a1\"},{\"slot\":\"43\",\"signing_root\":\"0xe006de1fafcb393d82f209973f7358814891a48bf6f99f16c24910721175f5eb\"},{\"slot\":\"73\",\"signing_root\":\"0x3f0c29b3633c3019247bcee8b2e1713b15724e62aaf958e0a89393dc8882af67\"},{\"slot\":\"77\",\"signing_root\":\"0xa63b60578b94f9877714767bc08c3b7384273c32b38b398c4a3826279868395b\"}],\"signed_attestations\":[{\"source_epoch\":\"0\",\"target_epoch\":\"0\",\"signing_root\":\"0x3297c22a09e217839e32b19dba38b4f32001fda529a8eca4fd3d1f4933b8b124\"},{\"source_epoch\":\"0\",\"target_epoch\":\"1\",\"signing_root\":\"0x9cf8343e487412f5805a5f439b150e644659247717c12d3275a541b44ac10b1d\"}]}                                                    
+                    ]}
+            }"
+            
+        }},
+
+        "response": {
+        "status": {"operator": "equals", "value": "200"},
+        "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+        "body": [{"operator": "jstructcmps","start": ["data"], "value":{"data":[{"status":"","message":""}]}}]}
+    },
+]

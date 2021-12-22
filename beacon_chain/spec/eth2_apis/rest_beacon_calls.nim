@@ -272,3 +272,6 @@ proc submitPoolVoluntaryExit*(body: SignedVoluntaryExit): RestPlainResponse {.
      rest, endpoint: "/api/eth/v1/beacon/pool/voluntary_exits",
      meth: MethodPost.}
   ## https://ethereum.github.io/beacon-APIs/#/Beacon/submitPoolVoluntaryExit
+proc getKeys*(): RestPlainResponse {.
+     rest, endpoint: "/api/eth/v1/keystores",
+     meth: MethodGet.}

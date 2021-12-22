@@ -928,6 +928,7 @@ proc runTest(conn: HttpConnectionRef, uri: Uri,
               name = testName,
               elapsed = $times[2], test_index = testIndex,
               worker_index = workerIndex
+
       except AsyncStreamError:
         return TestResult.failure(TestResultKind.ReadResponseBodyError,
                                   "Unable to read response body",

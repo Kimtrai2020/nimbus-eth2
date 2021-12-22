@@ -1,0 +1,56 @@
+[
+      
+ 
+    {
+      "topics": ["validator", "attester_duties"],
+      "request": {
+        "url": "/eth/v1/keystores/delete",
+        "method": "POST",
+        "headers": {"Accept": "application/json"},
+        "body": {"content-type": "application/json", "data": "[ \"0x8a64b0bf937c51b6ae320cc92ba63a7a16756b6d9a69564f8d1b8f30b19979df5a15d3cdfd3933e4c4752d1670928294\",
+          \"0xad096c82612669821ffea8292f3e1f27faf6db9d51969745548908371ebf4af36893749c370e80ada3e7a3aa74ccb67d\",
+          \"0xae00051dbb9046b353f86897d5ebb8eec545797679b5fb9f4f0bdfc5eae555af53e0b532b95bebf4417d96d992065611\"]"
+        
+        }
+      },
+      "response": {
+        "status": {"operator": "equals", "value": "200"},
+        "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+        "body": [{"operator": "jstructcmpns", "start": ["data"],  "value": {
+
+          "data": [{
+            "status": "",
+            "message": ""
+          }],
+          "slashing_protection":
+          {
+            "metadata": {
+              "interchange_format_version": "",
+              "genesis_validators_root": ""
+              },
+            "data":[{
+              "pubkey": "",
+              "signed_blocks": [
+              {
+                "slot": "",
+                "signing_root": ""},
+              {
+                "slot": ""
+              }],
+              "signed_attestations": [
+                {
+                  "source_epoch": "",
+                  "target_epoch": "",
+                  "signing_root": ""
+                },
+                {
+                  "source_epoch": "",
+                  "target_epoch": ""
+                }
+              ] 
+            }
+          ]
+        }}}]
+      }
+    },
+  ]

@@ -121,6 +121,25 @@ type
     uuid*: string
     version*: int
 
+  KeystoreKind* = enum
+    Local, Remote
+
+  RemoteKeystoreFlag* {.pure.} = enum
+    IgnoreSSLVerification
+
+  KeystoreData* = object
+    version*: uint64
+    pubkey*: ValidatorPubKey
+    description*: Option[string]
+    case kind*: KeystoreKind
+    of KeystoreKind.Local:
+      privateKey*: ValidatorPrivKey
+      path*: KeyPath
+      uuid*: string
+    of KeystoreKind.Remote:
+      remoteUrl*: Uri
+      flags*: set[RemoteKeystoreFlag]
+
   NetKeystore* = object
     crypto*: Crypto
     description*: ref string
@@ -128,14 +147,11 @@ type
     uuid*: string
     version*: int
 
-  RemoteKeystoreFlag* {.pure.} = enum
-    IgnoreSSLVerification
-
   RemoteSignerType* {.pure.} = enum
     Web3Signer
 
   RemoteKeystore* = object
-    version*: Option[uint64]
+    version*: uint64
     description*: Option[string]
     remoteType*: RemoteSignerType
     pubkey*: ValidatorPubKey
@@ -515,7 +531,7 @@ proc readValue*(r: var JsonReader, value: var Kdf)
 proc readValue*(r: var JsonReader, value: var RemoteKeystore)
                {.raises: [SerializationError, IOError, Defect].} =
   var
-    version: Option[uint64]
+    versionWasPresent = false
     description: Option[string]
     remote: Option[Uri]
     remoteType: Option[string]
@@ -538,10 +554,11 @@ proc readValue*(r: var JsonReader, value: var RemoteKeystore)
       remote = some(res)
       value.remote = res
     of "version":
-      if version.isSome():
+      if versionWasPresent:
         r.raiseUnexpectedField("Multiple `version` fields found",
                                "RemoteKeystore")
-      value.version = some(r.readValue(uint64))
+      value.version = r.readValue(uint64)
+      versionWasPresent = true
     of "description":
       let res = r.readValue(string)
       if value.description.isSome():
@@ -573,6 +590,8 @@ proc readValue*(r: var JsonReader, value: var RemoteKeystore)
       # Ignore unknown field names.
       discard
 
+  if not versionWasPresent:
+    r.raiseUnexpectedValue("Field version is missing")
   if remote.isNone():
     r.raiseUnexpectedValue("Field remote is missing")
   if pubkey.isNone():
@@ -780,12 +799,12 @@ proc createNetKeystore*(kdfKind: KdfKind,
   let
     secret = privKey.getBytes().get()
     cryptoField = createCryptoField(kdfKind, rng, secret, password, salt, iv)
-    pubKey = privKey.getPublicKey().get()
+    pubkey = privKey.getPublicKey().get()
     uuid = uuidGenerate().expect("Random bytes should be available")
 
   NetKeystore(
     crypto: cryptoField,
-    pubkey: pubKey,
+    pubkey: pubkey,
     description: newClone(description),
     uuid: $uuid,
     version: 1
