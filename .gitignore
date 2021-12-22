@@ -50,3 +50,6 @@ build/
 /dist
 /benchmark_results
 /.update.timestamp
+
+# Direnv + Nix Flake generated files
+.direnv/
