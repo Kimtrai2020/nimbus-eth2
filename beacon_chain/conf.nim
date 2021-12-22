@@ -327,6 +327,16 @@ type
         defaultValueDesc: "127.0.0.1"
         name: "rest-address" }: ValidIpAddress
 
+      restTraversals* {.
+        defaultValue: 10
+        desc: "The maximum number of expected concurrent historic traversals (API requests obtaining consecutive slot or epoch information)"
+        name: "rest-traversals" }: Natural
+
+      restTraversalsTtl* {.
+        defaultValue: 60
+        desc: "The maximum number of expected seconds between individual historic traversal queries"
+        name: "rest-traversals-ttl" }: Natural
+
       validatorApiEnabled* {.
         desc: "Enable the REST (BETA version) validator keystore management " &
               "API",

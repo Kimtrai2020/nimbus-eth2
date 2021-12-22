@@ -23,7 +23,8 @@ import
     sync_committee_msg_pool],
   ./spec/datatypes/base,
   ./sync/[sync_manager, request_manager],
-  ./validators/[action_tracker, validator_monitor, validator_pool]
+  ./validators/[action_tracker, validator_monitor, validator_pool],
+  ./rpc/rest_traversals_cache
 
 export
   osproc, chronos, httpserver, presto, action_tracker, beacon_clock,
@@ -68,6 +69,7 @@ type
     onAttestationSent*: OnAttestationCallback
     restKeysCache*: Table[ValidatorPubKey, ValidatorIndex]
     validatorMonitor*: ref ValidatorMonitor
+    restTraversalsCache*: RestTraversalsCache
 
 const
   MaxEmptySlotCount* = uint64(10*60) div SECONDS_PER_SLOT
